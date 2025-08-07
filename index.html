@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <title>Productenlijst met koper</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; }
+    h1, h2 { color: #333; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+    ul { padding-left: 1rem; }
+    label.sold {
+      text-decoration: line-through;
+      color: gray;
+    }
+  </style>
+</head>
+<body>
+  <h1>Productenlijst</h1>
+  
+  <label for="buyerName">Jouw naam:</label><br />
+  <input type="text" id="buyerName" placeholder="Vul je naam in" /><br /><br />
+
+  <form id="shopForm">
+    <div id="productList">Laden...</div>
+    <button type="button" onclick="verzenden()">Markeer als verkocht</button>
+  </form>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "JOUW_API_KEY",
+      authDomain: "JOUW_PROJECT.firebaseapp.com",
+      projectId: "JOUW_PROJECT",
+      storageBucket: "JOUW_PROJECT.appspot.com",
+      messagingSenderId: "JOUW_SENDER_ID",
+      appId: "JOUW_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const productListDiv = document.getElementById('productList');
+
+    function laadProducten() {
+      db.collection('products').onSnapshot(snapshot => {
+        productListDiv.innerHTML = '';
+        if (snapshot.empty) {
+          productListDiv.textContent = 'Geen producten gevonden.';
+          return;
+        }
+        snapshot.forEach(doc => {
+          const product = doc.data();
+          const label = document.createElement('label');
+          label.style.display = 'block';
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.name = 'product';
+          checkbox.value = doc.id;
+          checkbox.disabled = product.sold_to ? true : false;
+
+          if (product.sold_to) {
+            label.classList.add('sold');
+          }
+
+          label.appendChild(checkbox);
+          label.appendChild(document.createTextNode(' ' + product.name));
+          
+          // Toon koper indien verkocht
+          if (product.sold_to) {
+            const koperSpan = document.createElement('span');
+            koperSpan.style.fontStyle = 'italic';
+            koperSpan.style.marginLeft = '10px';
+            koperSpan.textContent = `(gekocht door: ${product.sold_to})`;
+            label.appendChild(koperSpan);
+          }
+
+          productListDiv.appendChild(label);
+        });
+      });
+    }
+
+    async function verzenden() {
+      const buyer = document.getElementById('buyerName').value.trim();
+      if (!buyer) {
+        alert('Vul je naam in voordat je producten kunt kopen!');
+        return;
+      }
+
+      const gekozen = [];
+      document.querySelectorAll('input[name="product"]:checked').forEach(cb => gekozen.push(cb.value));
+
+      if (gekozen.length === 0) {
+        alert('Selecteer minstens één product om te verkopen!');
+        return;
+      }
+
+      try {
+        for (const productId of gekozen) {
+          await db.collection('products').doc(productId).update({ sold_to: buyer });
+        }
+        alert('Producten gemarkeerd als verkocht!');
+        document.getElementById('shopForm').reset();
+      } catch (error) {
+        console.error('Fout bij updaten:', error);
+        alert('Er is een fout opgetreden. Probeer het opnieuw.');
+      }
+    }
+
+    laadProducten();
+  </script>
+</body>
+</html>
+
